@@ -1,6 +1,9 @@
 const ExifReader = require('exifreader');
 const crypto = require('crypto');
 
+const PHOTO_FRESHNESS_HOURS = parseInt(process.env.PHOTO_FRESHNESS_HOURS || '48', 10);
+const LOCATION_MISMATCH_KM = parseFloat(process.env.LOCATION_MISMATCH_KM || '2');
+
 /**
  * Parses EXIF date string in format "YYYY:MM:DD HH:MM:SS" into JavaScript Date
  */
@@ -58,6 +61,19 @@ function computeStructuralFingerprint(buffer) {
   return fingerprint;
 }
 
+function readTagDescription(tags, key) {
+  return tags[key] ? (tags[key].description || tags[key].value || null) : null;
+}
+
+function getImageResolution(tags) {
+  const width = readTagDescription(tags, 'ImageWidth') || readTagDescription(tags, 'PixelXDimension') || readTagDescription(tags, 'ExifImageWidth');
+  const height = readTagDescription(tags, 'ImageHeight') || readTagDescription(tags, 'PixelYDimension') || readTagDescription(tags, 'ExifImageHeight');
+  return {
+    width: width ? Number.parseInt(width, 10) : null,
+    height: height ? Number.parseInt(height, 10) : null
+  };
+}
+
 /**
  * Validates the uploaded file's metadata and checks originality
  * @param {Buffer} fileBuffer - Uploaded image buffer
@@ -78,7 +94,12 @@ async function verifyOriginality(fileBuffer, browserLocation, existingComplaints
       softwareEdited: false,
       isDuplicate: false,
       timeVarianceHours: null,
-      browserDistanceKm: null
+      browserDistanceKm: null,
+      orientation: null,
+      resolution: { width: null, height: null },
+      fileSizeBytes: fileBuffer.length,
+      fileSizeMb: Math.round((fileBuffer.length / (1024 * 1024)) * 100) / 100,
+      visualSimilarityMatch: null
     },
     flags: []
   };
@@ -90,19 +111,29 @@ async function verifyOriginality(fileBuffer, browserLocation, existingComplaints
   result.details.fingerprint = fingerprint;
 
   // Check duplicate hash
-  const duplicate = existingComplaints.find(c => c.sha256 === sha256 || (c.fingerprint && c.fingerprint === fingerprint));
+  const duplicate = existingComplaints.find(c => c.sha256 === sha256);
   if (duplicate) {
     result.isValid = false;
     result.status = 'DUPLICATE_DETECTED';
     result.score = 0;
     result.details.isDuplicate = true;
+    result.flags.push('Possible duplicate');
     result.flags.push('Exact duplicate of an existing complaint image');
     return result; // Quick return on duplicate
+  }
+
+  const visuallySimilar = existingComplaints.find(c => c.fingerprint && c.fingerprint === fingerprint);
+  if (visuallySimilar) {
+    result.score -= 30;
+    result.details.visualSimilarityMatch = visuallySimilar.id;
+    result.flags.push(`Possible duplicate: visually similar to ${visuallySimilar.id}`);
   }
 
   try {
     // 2. Load EXIF Metadata
     const tags = ExifReader.load(fileBuffer);
+    result.details.orientation = readTagDescription(tags, 'Orientation');
+    result.details.resolution = getImageResolution(tags);
     
     // 3. Extract GPS
     let lat = null;
@@ -138,7 +169,7 @@ async function verifyOriginality(fileBuffer, browserLocation, existingComplaints
       result.isValid = false;
       result.status = 'SUSPICIOUS_METADATA';
       result.score -= 40;
-      result.flags.push('Missing GPS coordinates in image metadata');
+      result.flags.push('Missing GPS metadata');
     }
 
     // 4. Extract Timestamp
@@ -155,10 +186,9 @@ async function verifyOriginality(fileBuffer, browserLocation, existingComplaints
         const diffHours = diffMs / (1000 * 60 * 60);
         result.details.timeVarianceHours = Math.round(diffHours * 10) / 10;
         
-        // Flag if photo was taken more than 48 hours ago
-        if (diffHours > 48) {
+        if (diffHours > PHOTO_FRESHNESS_HOURS) {
           result.score -= 20;
-          result.flags.push(`Photo is stale (taken ${result.details.timeVarianceHours} hours ago)`);
+          result.flags.push(`Old image: taken ${result.details.timeVarianceHours} hours ago`);
         }
       }
     }
@@ -181,7 +211,7 @@ async function verifyOriginality(fileBuffer, browserLocation, existingComplaints
       if (lowerSoft.includes('photoshop') || lowerSoft.includes('gimp') || lowerSoft.includes('lightroom') || lowerSoft.includes('picsart') || lowerSoft.includes('editor')) {
         result.details.softwareEdited = true;
         result.score -= 25;
-        result.flags.push(`Edited using software: ${software}`);
+        result.flags.push(`Potentially manipulated image: edited using ${software}`);
       }
     }
 
@@ -195,7 +225,7 @@ async function verifyOriginality(fileBuffer, browserLocation, existingComplaints
       result.details.browserDistanceKm = Math.round(dist * 100) / 100;
       
       // Flag if user location is more than 2 km away from photo location
-      if (dist > 2.0) {
+      if (dist > LOCATION_MISMATCH_KM) {
         result.score -= 20;
         result.flags.push(`Location mismatch: Uploaded photo taken ${result.details.browserDistanceKm} km away from submission location`);
       }
@@ -206,10 +236,12 @@ async function verifyOriginality(fileBuffer, browserLocation, existingComplaints
     result.isValid = false;
     result.status = 'SUSPICIOUS_METADATA';
     result.score = 10; // Highly suspicious if it's an image without standard structure
+    result.flags.push('Potentially manipulated image');
     result.flags.push('Unable to parse EXIF metadata (possible screenshot, scrubbed web image, or format conversion)');
   }
 
   // Adjust overall valid status based on score threshold
+  result.score = Math.max(0, Math.min(100, Math.round(result.score)));
   if (result.score < 50) {
     result.isValid = false;
     result.status = 'SUSPICIOUS_METADATA';

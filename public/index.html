@@ -3,8 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0d14">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Road Safety">
   <title>NHAI Citizen Safety & Road Defect Portal</title>
   <meta name="description" content="File road safety reports, verify image integrity, automatically route letters to NHAI Project units.">
+  <link rel="manifest" href="/manifest.webmanifest">
   
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="/css/style.css">
@@ -43,27 +48,178 @@
               <label class="form-label" for="category-select">Issue Category</label>
               <select class="form-select" id="category-select" required>
                 <option value="" disabled selected>Select road damage type</option>
-                <option value="pothole">Pothole (Structural Base Failure)</option>
-                <option value="cracks">Cracking / Pavement Fatigue</option>
-                <option value="faded_markings">Faded Lane Markings</option>
-                <option value="debris">Debris / Roadway Obstruction</option>
+                <option value="pothole">Pothole</option>
+                <option value="cracks">Crack</option>
+                <option value="rutting">Rutting</option>
+                <option value="edge_break">Edge break</option>
+                <option value="surface_erosion">Surface erosion</option>
+                <option value="waterlogging">Waterlogging</option>
+                <option value="shoulder_damage">Shoulder damage</option>
+                <option value="road_sinking">Road sinking</option>
                 <option value="other">Other Road Hazard</option>
               </select>
+            </div>
+
+            <div class="auto-context-panel" id="auto-context-panel">
+              <div class="context-grid">
+                <div>
+                  <span class="context-label">GPS Location</span>
+                  <strong id="auto-gps">Waiting for image GPS</strong>
+                </div>
+                <div>
+                  <span class="context-label">Road Name</span>
+                  <strong id="auto-road-name">--</strong>
+                </div>
+                <div>
+                  <span class="context-label">Road Type</span>
+                  <strong id="auto-road-type">--</strong>
+                </div>
+                <div>
+                  <span class="context-label">Authority</span>
+                  <strong id="auto-authority">--</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="auto-context-panel">
+              <div class="verification-header">
+                <span class="verification-title">Road Details</span>
+                <span class="badge badge-neutral">Confirm</span>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label class="form-label" for="state-select">State</label>
+                  <select class="form-select" id="state-select" onchange="handleRoadOptionChange('state')" required></select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="district-select">District</label>
+                  <select class="form-select" id="district-select" onchange="handleRoadOptionChange('district')" required></select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="area-select">Area</label>
+                  <select class="form-select" id="area-select" onchange="handleRoadOptionChange('area')" required></select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="road-name-select">Road Name</label>
+                  <select class="form-select" id="road-name-select" onchange="handleRoadOptionChange('road')" required></select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="road-type-select">Road Type</label>
+                  <select class="form-select" id="road-type-select" required></select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="highway-no-select">Highway No</label>
+                  <select class="form-select" id="highway-no-select"></select>
+                </div>
+              </div>
             </div>
             
             <div class="form-group">
               <label class="form-label" for="description-input">Description / Details</label>
               <textarea class="form-textarea" id="description-input" placeholder="Provide details (e.g. landmark, Highway name, size of pothole, lane side) to assist maintenance units..." required></textarea>
             </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label" for="landmark-input">Landmark Near Defect</label>
+                <input type="text" class="form-input" id="landmark-input" placeholder="e.g. Near toll plaza or bus stop">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="direction-select">Direction of Travel</label>
+                <select class="form-select" id="direction-select">
+                  <option value="">Select direction</option>
+                  <option value="Northbound">Northbound</option>
+                  <option value="Southbound">Southbound</option>
+                  <option value="Eastbound">Eastbound</option>
+                  <option value="Westbound">Westbound</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="dimensions-input">Estimated Defect Size</label>
+                <input type="text" class="form-input" id="dimensions-input" placeholder="e.g. 1m x 0.5m, lane-wide">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="traffic-impact-select">Traffic Impact Level</label>
+                <select class="form-select" id="traffic-impact-select">
+                  <option value="">Select impact</option>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="safety-risk-select">Safety Risk Level</label>
+                <select class="form-select" id="safety-risk-select">
+                  <option value="">Select risk</option>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="ai-enrichment-panel" id="ai-enrichment-panel">
+              <div class="verification-header">
+                <span class="verification-title">AI Complaint Enrichment</span>
+                <span id="ai-enrichment-badge" class="badge badge-neutral">Waiting</span>
+              </div>
+              <div class="context-grid">
+                <div>
+                  <span class="context-label">Model Decision</span>
+                  <strong id="ai-category">--</strong>
+                </div>
+                <div>
+                  <span class="context-label">Severity</span>
+                  <strong id="ai-severity">--</strong>
+                </div>
+                <div>
+                  <span class="context-label">Urgency</span>
+                  <strong id="ai-urgency">--</strong>
+                </div>
+                <div>
+                  <span class="context-label">Confidence</span>
+                  <strong id="ai-confidence">--</strong>
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary compact-btn" id="apply-ai-btn" onclick="applyAiSuggestion()" disabled>Apply AI Suggestion</button>
+            </div>
             
             <div class="form-group">
               <label class="form-label">Evidence Media (Photo/Video)</label>
-              <div class="upload-zone" id="drop-zone" onclick="triggerFileInput()">
-                <div class="upload-icon">↑</div>
-                <p class="upload-text-main">Drag & drop your photo here</p>
-                <p class="upload-text-sub">or click to browse from device (JPEG/PNG, max 10MB)</p>
-                <input type="file" id="media-file" class="file-input" accept="image/jpeg,image/png" onchange="handleFileSelect(event)">
+              <div class="upload-zone" id="drop-zone">
+                <button type="button" class="btn btn-secondary compact-btn upload-action-button" id="upload-action-btn" onclick="showUploadSheet()">
+                  Upload Image
+                </button>
+                <div class="upload-summary" id="upload-summary">
+                  <p class="upload-text-main">Tap to choose camera or gallery</p>
+                  <p class="upload-text-sub">Photo GPS will auto-populate location fields.</p>
+                </div>
               </div>
+
+              <div class="bottom-sheet-overlay" id="upload-sheet" onclick="closeUploadSheet()">
+                <div class="sheet-panel" onclick="event.stopPropagation()">
+                  <button type="button" class="sheet-item" onclick="triggerCameraInput()">Take Photo</button>
+                  <button type="button" class="sheet-item" onclick="triggerGalleryInput()">Choose from Gallery</button>
+                  <button type="button" class="sheet-item sheet-cancel" onclick="closeUploadSheet()">Cancel</button>
+                </div>
+              </div>
+
+              <div class="camera-modal-overlay" id="camera-modal" onclick="closeCameraModal()">
+                <div class="camera-modal-panel" onclick="event.stopPropagation()">
+                  <div class="camera-header">
+                    <span>Camera Capture</span>
+                    <button type="button" class="sheet-item sheet-cancel compact-btn" onclick="closeCameraModal()">Close</button>
+                  </div>
+                  <video id="camera-preview" autoplay playsinline muted></video>
+                  <div class="camera-controls">
+                    <button type="button" class="sheet-item" onclick="captureCameraPhoto()">Capture Photo</button>
+                  </div>
+                </div>
+              </div>
+
+              <input type="file" id="camera-file" class="file-input" accept="image/*" capture="environment" onchange="handleFileSelect(event)">
+              <input type="file" id="gallery-file" class="file-input" accept="image/*" onchange="handleFileSelect(event)">
             </div>
 
             <button type="submit" class="btn" id="submit-btn" disabled>
@@ -112,6 +268,7 @@
 
           <!-- Map Box -->
           <div id="map-container"></div>
+          <p class="map-helper" id="map-helper">Use current GPS or pick a point on the map if the photo has no geotag.</p>
         </div>
       </div>
     </section>
@@ -260,6 +417,49 @@
         </div>
       </div>
 
+      <!-- Geospatial Heatmap -->
+      <div class="glass-card heatmap-card">
+        <div class="dashboard-section-header">
+          <div>
+            <h3>Geospatial Complaint Heatmap</h3>
+            <p class="section-subtitle">Density hotspots by defect category, severity, and filing period.</p>
+          </div>
+          <div class="heatmap-density-pill">
+            <span id="heatmap-visible-count">0</span>
+            <span>mapped complaints</span>
+          </div>
+        </div>
+
+        <div class="heatmap-controls">
+          <div class="form-group">
+            <label class="form-label" for="heatmap-category-filter">Category</label>
+            <select class="form-select" id="heatmap-category-filter" onchange="applyHeatmapFilters()">
+              <option value="all">All categories</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="heatmap-severity-filter">Severity</label>
+            <select class="form-select" id="heatmap-severity-filter" onchange="applyHeatmapFilters()">
+              <option value="all">All severity levels</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="heatmap-time-filter">Time range</label>
+            <select class="form-select" id="heatmap-time-filter" onchange="applyHeatmapFilters()">
+              <option value="all">All time</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="admin-heatmap"></div>
+      </div>
+
       <!-- Complaints Table -->
       <div class="glass-card" style="margin-bottom: 2rem;">
         <h3 style="margin-bottom: 1rem;">Recent Citizens Reports</h3>
@@ -313,11 +513,21 @@
 
   <!-- Leaflet Map JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
   
   <!-- Client ExifReader CDN -->
   <script src="https://cdn.jsdelivr.net/npm/exifreader@4.23.3/dist/exif-reader.js"></script>
 
   <!-- Frontend logic App JS -->
   <script src="/js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').catch(err => {
+          console.warn('Service worker registration failed:', err.message);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

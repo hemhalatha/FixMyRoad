@@ -63,14 +63,64 @@ Start the local server process:
 ```bash
 npm start
 ```
-The server will start up and output:
-`NHAI Safety Portal backend running on http://localhost:3000`
+The server binds to `0.0.0.0` by default and prints both local and LAN URLs, for example:
+```text
+Local URL:   http://localhost:3000
+Network URL: http://192.168.1.10:3000
+```
 
-### 3. Open in Browser
-Open your browser and visit:
+### 3. Open on Desktop or Phone
+Open the local URL on the development machine:
 ```
 http://localhost:3000
 ```
+
+Open the network URL from any phone, tablet, or laptop on the same Wi-Fi/LAN:
+```
+http://<local-ip-address>:3000
+```
+
+On mobile browsers, use the Camera button to capture a road photo directly, Gallery to choose an existing image, Share Current GPS to provide the device location, or Pick Location on Map when GPS/EXIF is unavailable.
+
+---
+
+## 🌐 Environment Configuration
+
+Copy `.env.example` values into your deployment environment as needed:
+
+```bash
+HOST=0.0.0.0
+PORT=3000
+NODE_ENV=development
+CORS_ORIGIN=*
+```
+
+Useful presets:
+
+* **Development/LAN:** `HOST=0.0.0.0`, `CORS_ORIGIN=*`
+* **Staging:** set `NODE_ENV=staging`, restrict `CORS_ORIGIN` to your staging URL
+* **Production:** set `NODE_ENV=production`, restrict `CORS_ORIGIN` to your public domain
+
+The app uses relative frontend API calls, so it works behind a public URL, reverse proxy, Railway/Render URL, cloud VPS, AWS, Azure, or Google Cloud without code changes.
+
+---
+
+## 🐳 Docker Deployment
+
+Build and run locally:
+
+```bash
+docker build -t road-safety-complaints .
+docker run --rm -p 3000:3000 --env-file .env road-safety-complaints
+```
+
+For cloud platforms, expose port `3000` and provide environment variables from `.env.example`. Mount persistent storage for `data/`, `public/uploads/`, `public/pdfs/`, and `sent_emails/` if complaint history must survive container restarts.
+
+---
+
+## 📱 PWA Support
+
+The frontend includes a web app manifest and service worker. Mobile users can install the portal to the home screen from supported browsers. Static assets are cached for an app-like shell; complaint submission still requires network access.
 
 ---
 
