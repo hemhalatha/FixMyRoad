@@ -1,179 +1,168 @@
 # NHAI Citizen Safety & Road Defect Management Portal
 
-An automated, full-stack platform designed to collect road defect complaints, run integrity & originality validations, classify pavement damage via computer vision, generate official complaint letters, and route notifications to regional NHAI Project Implementation Units (PIU).
+Production-ready road defect complaint platform for citizens and road authorities. The system combines image authenticity checks, AI-based defect classification, location intelligence, smart routing, dashboards, PWA support, and a modular backend designed for future expansion.
 
----
+## Product Scope
 
-## 🏗️ System Architecture & Workflow
+The platform currently supports:
+
+1. Complaint submission with photo upload, mobile camera capture, and GPS sharing.
+2. EXIF-based authenticity verification and duplicate detection.
+3. AI model integration for pavement condition classification.
+4. Road context resolution and authority routing.
+5. Complaint tracking, PDF generation, and email logging.
+6. Geospatial heatmaps and analytics dashboards.
+7. PWA support for home-screen installation and offline shell caching.
+
+## Architecture
 
 ```mermaid
 graph TD
-    A[Citizen Frontend UI] -->|1. Submit Photo & Form| B[Express Backend Server]
-    B --> C[2. Originality Check Service]
-    B --> D[3. AI Damage Classification]
-    B --> E[4. PDF Document Generator]
-    B --> F[5. PIU Email Router]
-    
-    C -->|Extracts EXIF Coordinates, Taken-Time, & Check Dupes| G[(Local JSON database)]
-    D -->|Validates Potholes / Cracks / Faded Markings| G
-    E -->|Generates Formal NHAI PDF Letter with Image| H[Public/PDFs/ Folder]
-    F -->|Maps Location to Closest PIU Office| I[Sent_Emails/ Preview Folder]
-    
-    G -->|Retrieve Status & Timeline| J[Tracking Dashboard]
+  A[Mobile or Desktop Web UI] --> B[Express API]
+  B --> C[Metadata & Authenticity Service]
+  B --> D[AI Classification Service]
+  B --> E[Location Intelligence Service]
+  B --> F[PDF Generator]
+  B --> G[Authority Router]
+  C --> H[(complaints.json)]
+  D --> H
+  E --> H
+  F --> I[(public/pdfs)]
+  G --> J[(sent_emails)]
+  H --> K[Tracking, Analytics, Heatmaps]
 ```
 
----
+## Core Modules
 
-## 👥 Team Roles & Integration Blueprint
+- `server.js`: API routes, complaint workflow, location endpoints, stats, and export hooks.
+- `services/metadataService.js`: EXIF parsing, image freshness checks, duplicate checks, visual similarity flags, and authenticity scoring.
+- `services/modelService.js`: Local `.pt` model bridge and deployed API integration.
+- `services/locationService.js`: Reverse geocoding, road type classification, and authority selection.
+- `services/emailService.js`: PIU/authority routing, email preview logging, and dispatch metadata.
+- `services/pdfService.js`: Complaint letter generation.
+- `public/js/app.js`: Mobile upload flow, location capture, road context population, AI suggestions, dashboards, and heatmaps.
 
-This codebase acts as the central integration base for our project. Here is how our team's deliverables map to the codebase:
+## Complaint Data Model
 
-### 1. Jesika (Completed & Fully Operational)
-* **Intake Interface**: HTML5 Drag-and-drop form with Leaflet map pinpointing.
-* **Originality Audit Engine**: Validates image EXIF geotags, checks timestamp differences, audits editing software traces, and scans image SHA-256/pixel fingerprints to reject duplicate uploads.
-* **Model Integration Module**: Serves classifications and coordinates.
-* **Complaint Letter PDF Compiler**: Generates formatted A4 PDF letters with official headers, metadata metrics, and embedded image evidence.
-* **PIU Email Router**: Calculates geodesic distances using the Haversine formula to map coordinates to regional PIU offices (Delhi, Mumbai, Varanasi, Bangalore, Chennai, Guwahati, Kolkata) and logs dispatch files.
-* **Tracking System**: A step-by-step workflow tracking timeline.
+Each complaint stores a rich record for auditing, routing, and analytics:
 
-### 2. Hemhalatha (Integration Hooks Prepared)
-* **Model Training Integration**: Hook points are created inside `services/modelService.js`. When your road defect trained model is ready, toggle `USE_REAL_MODEL_API` to `true` to direct image streams to your classification API.
-* **Heatmap Generation**: All coordinates, timestamps, and categories are saved inside `data/complaints.json`. You can read this database file on your heatmap UI and plot coordinates onto Leaflet/Google maps.
-* **Multilingual UI Support**: CSS and layout tags are fully structured to easily map translation JSON elements on the frontend.
-
-### 3. Meenakshi (Integration Hooks Prepared)
-* **AI Chatbot with RAG**: Chat UI placeholders and Express backend server handles are structured. You can mount your chatbot endpoint inside `server.js` and serve it through the frontend UI.
-* **Country Onboarding Framework**: Data onboarding APIs can read and push records through `POST /api/complaints` and `GET /api/complaints`.
-
----
-
-## ⚙️ Installation & Running the Application
-
-Ensure you have [Node.js](https://nodejs.org/) installed, then follow these steps:
-
-### 1. Initialize Dependencies
-Open your terminal in the project directory and run:
-```bash
-npm install
-```
-This installs the required packages: `express`, `multer` (file handling), `exifreader` (metadata parsing), `pdfkit` (PDF rendering), `nodemailer` (email routing), and `uuid` (unique ID generation).
-
-### 2. Run the Server
-Start the local server process:
-```bash
-npm start
-```
-The server binds to `0.0.0.0` by default and prints both local and LAN URLs, for example:
-```text
-Local URL:   http://localhost:3000
-Network URL: http://192.168.1.10:3000
+```json
+{
+  "id": "NHAI-2026-XXXXXXX",
+  "imageMetadata": {},
+  "authenticityScore": 0,
+  "verificationFlags": [],
+  "roadName": "",
+  "roadType": "",
+  "authority": "",
+  "district": "",
+  "state": "",
+  "landmark": "",
+  "severity": "",
+  "estimatedDimensions": "",
+  "trafficImpact": "",
+  "safetyRisk": "",
+  "routingStatus": ""
+}
 ```
 
-### 3. Open on Desktop or Phone
-Open the local URL on the development machine:
-```
-http://localhost:3000
-```
+Additional stored fields include:
 
-Open the network URL from any phone, tablet, or laptop on the same Wi-Fi/LAN:
-```
-http://<local-ip-address>:3000
-```
+- `modelResults`
+- `aiEnrichment`
+- `roadContext`
+- `piuEmailMapping`
+- `metadataResults`
+- `status`
+- `createdAt`
 
-On mobile browsers, use the Camera button to capture a road photo directly, Gallery to choose an existing image, Share Current GPS to provide the device location, or Pick Location on Map when GPS/EXIF is unavailable.
+## API Reference
 
----
+### Complaint Workflow
 
-## 🌐 Environment Configuration
+- `POST /api/complaints`
+- `GET /api/complaints`
+- `GET /api/complaints/:id`
+- `GET /api/complaints/stats`
+- `GET /api/complaints/geo`
 
-Copy `.env.example` values into your deployment environment as needed:
+### Intelligence & Location
+
+- `POST /api/model/analyze`
+- `GET /api/location/context?lat=&lon=`
+- `GET /api/location/options`
+
+### Activity Logs
+
+- `GET /api/email-activity`
+
+## Configuration
+
+Environment variables supported by the platform:
 
 ```bash
 HOST=0.0.0.0
 PORT=3000
 NODE_ENV=development
 CORS_ORIGIN=*
+
+USE_LOCAL_PT_MODEL=true
+MODEL_WEIGHTS_PATH=./best.pt
+MODEL_PYTHON_PATH=python
+USE_REAL_MODEL_API=false
+MODEL_API_ENDPOINT=http://localhost:8000/predict
+MODEL_API_TIMEOUT_MS=10000
+
+PHOTO_FRESHNESS_HOURS=48
+LOCATION_MISMATCH_KM=2
+
+ENABLE_REVERSE_GEOCODING=true
+REVERSE_GEOCODE_ENDPOINT=https://nominatim.openstreetmap.org/reverse
+REVERSE_GEOCODE_TIMEOUT_MS=4000
 ```
 
-Useful presets:
+## Future Expansion Areas
 
-* **Development/LAN:** `HOST=0.0.0.0`, `CORS_ORIGIN=*`
-* **Staging:** set `NODE_ENV=staging`, restrict `CORS_ORIGIN` to your staging URL
-* **Production:** set `NODE_ENV=production`, restrict `CORS_ORIGIN` to your public domain
+This codebase is structured so these can be added without a rewrite:
 
-The app uses relative frontend API calls, so it works behind a public URL, reverse proxy, Railway/Render URL, cloud VPS, AWS, Azure, or Google Cloud without code changes.
+1. Multi-language translation packs for all UI labels and messages.
+2. Role-based access control for citizens, reviewers, and administrators.
+3. Complaint escalation workflows and SLA timers.
+4. GIS layers from government road datasets.
+5. External data connectors for road inventory and asset condition.
+6. SMS and WhatsApp notifications.
+7. Automated duplicate clustering and similarity search at scale.
+8. Audit trails and immutable event logs.
+9. Chat-based grievance assistant.
+10. Export pipelines for CSV, PDF, and BI tools.
+11. Additional analytics pages for severity trends and locality hotspots.
+12. OpenAPI / Swagger documentation.
+13. Public API keys integration for data.gov.in, NHAI, and MoRTH-backed datasets where available.
 
----
+## Testing Notes
 
-## 🐳 Docker Deployment
+Recommended manual checks:
 
-Build and run locally:
+1. Upload a real geotagged mobile image and confirm GPS, road context, and authority fields populate.
+2. Upload a screenshot or edited image and confirm authenticity flags are raised.
+3. Test mobile camera upload, gallery upload, and GPS sharing on a phone.
+4. Confirm the heatmap dashboard reflects stored complaints.
+5. Verify the complaint record contains the new road and metadata fields.
 
-```bash
-docker build -t road-safety-complaints .
-docker run --rm -p 3000:3000 --env-file .env road-safety-complaints
+## Repository Structure
+
+```text
+server.js
+services/
+public/
+data/
+sent_emails/
+best.pt
 ```
 
-For cloud platforms, expose port `3000` and provide environment variables from `.env.example`. Mount persistent storage for `data/`, `public/uploads/`, `public/pdfs/`, and `sent_emails/` if complaint history must survive container restarts.
+## Notes for Contributors
 
----
-
-## 📱 PWA Support
-
-The frontend includes a web app manifest and service worker. Mobile users can install the portal to the home screen from supported browsers. Static assets are cached for an app-like shell; complaint submission still requires network access.
-
----
-
-## 🛠️ Code Structure & Developer Guide
-
-```
-Road safety 1/
-│
-├── server.js               # Main Express app, middleware, and api routes
-├── package.json            # Node dependency configurations
-├── .gitignore              # Excludes development folders, uploads, PDFs, and email drafts
-│
-├── services/               # Jesika's Backend Business Logic
-│   ├── metadataService.js  # EXIF parsing, gps validation, distance maths, & duplicate hashing
-│   ├── modelService.js     # Road classification engine (pluggable API model bridge)
-│   ├── pdfService.js       # Assembles the NHAI official letter PDF documents
-│   └── emailService.js     # Resolves closest PIU emails and writes dispatch previews
-│
-├── data/
-│   └── complaints.json     # Local database record storing all filed incidents
-│
-├── sent_emails/            # Preview drafts of sent email logs (Open HTML files in browser)
-│
-└── public/                 # Citizen Dashboard Frontend UI
-    ├── index.html          # Web page structural sections (Tabs, Form, Stepper Tracker)
-    ├── css/style.css       # Premium glassmorphic custom theme
-    ├── js/app.js           # Extracts client EXIF, updates Leaflet maps, & runs API fetches
-    ├── uploads/            # Holds citizen evidence photographs
-    └── pdfs/               # Holds compiled NHAI complaint PDF documents
-```
-
----
-
-## 🔍 How to Test the Portals Features
-
-1. **Verify GPS Pinning (Real Photo)**:
-   * Select a picture taken on a smartphone with location services enabled.
-   * The Leaflet map on the right will instantly pin the photo's exact capture location.
-   * Submit the complaint. The AI laser line will scan, file the issue, generate a PDF, map the closest PIU office, and write a mock dispatch email.
-
-2. **Verify Fake Detection (Downloaded Picture / Screenshot)**:
-   * Select a downloaded image from Google or a screenshot (EXIF headers are stripped/missing).
-   * The system will flag a `Warning: Missing GPS` badge and lock the map.
-   * If submitted, the portal marks the status as `Flagged for Review` (Quarantined) and blocks it from routing emails to PIU offices.
-
-3. **Verify Spoof Detection (Edited Photo)**:
-   * Upload an image edited in Photoshop or Lightroom.
-   * The system flags the editing software used in the metadata list, drops the Originality Score, and flags it as suspicious.
-
-4. **Verify Duplicate Prevention**:
-   * Attempt to upload the exact same image twice.
-   * The backend rejects the second upload instantly, notifying the citizen of a duplicate submission.
-
-5. **Review Outputs**:
-   * Inspect the formatted PDF letters inside `public/pdfs/`.
-   * Open the mock HTML email dispatches in the `sent_emails/` folder to review what details route to the Project Directors.
+- Keep API responses backward-compatible where possible.
+- Prefer modular service changes over adding logic directly to route handlers.
+- Use relative frontend API calls so the same build works behind localhost, LAN, and public hosts.
+- Treat `data/complaints.json` as the local persistence layer unless a database is introduced later.
