@@ -47,21 +47,25 @@ document.addEventListener('DOMContentLoaded', () => {
  * Retrieve User's current browser location
  */
 function requestBrowserLocation() {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        browserGpsCoords = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        };
-        console.log('Browser coordinates captured:', browserGpsCoords);
-      },
-      (error) => {
-        console.warn('Browser location access denied or unavailable:', error.message);
-      },
-      { enableHighAccuracy: true, timeout: 5000 }
-    );
+  if (!navigator.geolocation) {
+    console.warn('Browser geolocation is not supported on this device.');
+    return;
   }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      browserGpsCoords = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude
+      };
+      console.log('Browser coordinates captured:', browserGpsCoords);
+    },
+    (error) => {
+      console.warn('Browser location access denied or unavailable:', error.message);
+      browserGpsCoords = null;
+    },
+    { enableHighAccuracy: true, timeout: 5000 }
+  );
 }
 
 /**
@@ -293,6 +297,16 @@ async function submitComplaint(event) {
     if (stage === 4) label.innerText = 'Routing PIU regional boundaries...';
     if (stage === 5) label.innerText = 'Generating PDF Letter attachment...';
   }, 700);
+
+  const hasUsableGps = Boolean(clientGpsCoords || browserGpsCoords);
+  if (!hasUsableGps) {
+    clearInterval(scanInterval);
+    scanner.style.display = 'none';
+    submitBtn.removeAttribute('disabled');
+    submitBtn.innerText = 'Submit Verified Complaint';
+    alert('No usable GPS location was found. Please allow browser location access or upload a photo with EXIF GPS metadata.');
+    return;
+  }
 
   // Compile FormData
   const formData = new FormData();
