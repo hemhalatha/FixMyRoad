@@ -7,3 +7,5 @@ sent_emails/activity_log.json
 data/complaints.json
 .DS_Store
 .env
+__pycache__/
+*.pyc*

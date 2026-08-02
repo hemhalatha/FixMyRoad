@@ -59,6 +59,11 @@ async function routeComplaintEmail(complaint, pdfPath) {
     gpsCoords ? gpsCoords.latitude : null,
     gpsCoords ? gpsCoords.longitude : null
   );
+  const targetAuthority = complaint.authority || {
+    type: 'NHAI PIU',
+    name: targetPIU.name,
+    email: targetPIU.email
+  };
 
   const emailSubject = `[URGENT ROAD SAFETY] Complaint Filed - Ref ID: ${complaint.id} (${complaint.category.toUpperCase()})`;
   
@@ -85,7 +90,7 @@ async function routeComplaintEmail(complaint, pdfPath) {
         </div>
         <div class="content">
           <p>Dear Project Director,</p>
-          <p>An official road defect complaint has been registered on the NHAI Road Safety citizen portal. Based on geographical coordinate matching, this incident falls within the jurisdiction of <strong>${targetPIU.name}</strong>.</p>
+          <p>An official road defect complaint has been registered on the NHAI Road Safety citizen portal. Based on road classification and geographical coordinate matching, this incident is routed to <strong>${targetAuthority.name}</strong> (${targetAuthority.type}).</p>
           
           <h3>Incident Summary:</h3>
           <table class="info-table">
@@ -96,6 +101,14 @@ async function routeComplaintEmail(complaint, pdfPath) {
             <tr>
               <th>Issue Classification (AI)</th>
               <td>${complaint.modelResults.displayName || complaint.category} (Confidence: ${complaint.modelResults.confidence}%)</td>
+            </tr>
+            <tr>
+              <th>Road Context</th>
+              <td>${complaint.roadName || 'Unknown road'} - ${complaint.roadType || 'Unclassified'}${complaint.district ? `, ${complaint.district}` : ''}${complaint.state ? `, ${complaint.state}` : ''}</td>
+            </tr>
+            <tr>
+              <th>Responsible Authority</th>
+              <td>${targetAuthority.name} (${targetAuthority.type})</td>
             </tr>
             <tr>
               <th>Geographical Location</th>
@@ -142,7 +155,7 @@ async function routeComplaintEmail(complaint, pdfPath) {
   // Write the preview file
   const emailLogData = `
 <!-- 
-  TO: ${targetPIU.email}
+  TO: ${targetAuthority.email || targetPIU.email}
   SUBJECT: ${emailSubject}
   ATTACHMENT: ${pdfPath}
 -->
@@ -152,8 +165,8 @@ ${emailHtml}
 
   // nodemailer code mock / actual sending
   let sentInfo = {
-    routedTo: targetPIU.name,
-    email: targetPIU.email,
+    routedTo: targetAuthority.name,
+    email: targetAuthority.email || targetPIU.email,
     subject: emailSubject,
     previewFile: `/sent_emails/${logFileName}`,
     sentTime: new Date().toISOString()
@@ -174,8 +187,8 @@ ${emailHtml}
     }
     activity.unshift({
       id: complaint.id,
-      piuName: targetPIU.name,
-      piuEmail: targetPIU.email,
+      piuName: targetAuthority.name,
+      piuEmail: targetAuthority.email || targetPIU.email,
       sentAt: sentInfo.sentTime,
       previewFile: logFileName,
       subject: emailSubject,

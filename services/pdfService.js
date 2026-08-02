@@ -12,6 +12,8 @@ const path = require('path');
 function createComplaintPDF(complaint, imagePath, outputPath) {
   return new Promise((resolve, reject) => {
     try {
+      const sha256 = complaint.sha256 || (complaint.metadataResults.details && complaint.metadataResults.details.sha256) || 'unavailable';
+
       // Ensure the output directory exists
       const dir = path.dirname(outputPath);
       if (!fs.existsSync(dir)) {
