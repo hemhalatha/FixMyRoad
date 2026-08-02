@@ -1,4 +1,4 @@
-# NHAI Citizen Safety & Road Defect Management Portal
+# Road Safety Complaint Portal
 
 Production-ready road defect complaint platform for citizens and road authorities. The system combines image authenticity checks, AI-based defect classification, location intelligence, smart routing, dashboards, PWA support, and a modular backend designed for future expansion.
 

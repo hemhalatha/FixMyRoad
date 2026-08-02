@@ -10,7 +10,7 @@ const { verifyOriginality } = require('./services/metadataService');
 const { analyzeRoadCondition } = require('./services/modelService');
 const { createComplaintPDF } = require('./services/pdfService');
 const { routeComplaintEmail, findNearestPIU } = require('./services/emailService');
-const { resolveRoadContext, determineAuthority } = require('./services/locationService');
+const { findNearestContract, calculateHazardIndex } = require('./services/contractService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -235,6 +235,10 @@ app.post('/api/complaints', upload.single('image'), async (req, res) => {
     } = req.body;
     
     if (!req.file) {
+      console.error('Upload route called without a parsed file', {
+        body: req.body,
+        headers: req.headers
+      });
       return res.status(400).json({ error: 'No image file uploaded' });
     }
 
@@ -283,7 +287,7 @@ app.post('/api/complaints', upload.single('image'), async (req, res) => {
     const complaintId = `NHAI-${year}-${uuidv4().substring(0, 8).toUpperCase()}`;
 
     // 3. Save the image to the public upload directory
-    const imageExt = path.extname(req.file.originalname) || '.jpg';
+    const imageExt = path.extname(req.file.originalname || '') || '.jpg';
     const imageFileName = `${complaintId}${imageExt}`;
     const savedImagePath = path.join(UPLOAD_DIR, imageFileName);
     fs.writeFileSync(savedImagePath, imageBuffer);
@@ -319,6 +323,15 @@ app.post('/api/complaints', upload.single('image'), async (req, res) => {
       email: piuEmailMapping.email,
       distanceKm: piuEmailMapping.distanceKm || null
     };
+
+    // Resolve closest contractor & budget info
+    const contractorDetails = findNearestContract(
+      gpsCoords ? gpsCoords.latitude : null,
+      gpsCoords ? gpsCoords.longitude : null
+    );
+
+    // Calculate dynamic Hazard index
+    const hazardResults = calculateHazardIndex(category, description, metadataResults.score);
 
     // Create the full complaint structure
     const newComplaint = {
@@ -380,6 +393,8 @@ app.post('/api/complaints', upload.single('image'), async (req, res) => {
         email: piuEmailMapping.email,
         distanceKm: piuEmailMapping.distanceKm || null
       },
+      contractorDetails: contractorDetails,
+      hazardResults: hazardResults,
       status: metadataResults.isValid ? 'Emailed to PIU' : 'Flagged for Review',
       routingStatus: metadataResults.isValid ? `Routed to ${responsibleAuthority.name}` : 'Flagged for manual review',
       createdAt: new Date().toISOString()
@@ -415,12 +430,17 @@ app.post('/api/complaints', upload.single('image'), async (req, res) => {
         metadataResults: newComplaint.metadataResults,
         modelResults: newComplaint.modelResults,
         piuEmailMapping: newComplaint.piuEmailMapping,
+        contractorDetails: newComplaint.contractorDetails,
+        hazardResults: newComplaint.hazardResults,
         emailDispatch: newComplaint.emailDispatch
       }
     });
 
   } catch (err) {
     console.error('Server error handling complaint:', err);
+    if (err.stack) {
+      console.error(err.stack);
+    }
     res.status(500).json({ error: 'Internal Server Error', message: err.message });
   }
 });

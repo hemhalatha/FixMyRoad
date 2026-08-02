@@ -4,15 +4,7 @@ let clientGpsCoords = null; // Coordinates extracted from photo EXIF
 let browserGpsCoords = null; // Browser geolocation coordinates
 let mainMap = null;
 let mainMarker = null;
-let heatmapMap = null;
-let heatmapLayer = null;
-let heatmapMarkersLayer = null;
-let heatmapComplaintData = [];
-let latestAiSuggestion = null;
-let latestRoadContext = null;
-let manualGpsCoords = null;
-let manualLocationMode = false;
-let roadOptionData = null;
+let currentLanguage = 'en';
 
 // Initialize components when page loads
 document.addEventListener('DOMContentLoaded', () => {
@@ -136,116 +128,36 @@ function handleRoadOptionChange(level) {
     }
   }
 
-  updateRoadContextPreview();
-}
+  // Poll complaints list if admin tab loaded
+  loadAdminData();
 
-function updateRoadContextPreview() {
-  const state = document.getElementById('state-select').value;
-  const district = document.getElementById('district-select').value;
-  const area = document.getElementById('area-select').value;
-  const roadName = document.getElementById('road-name-select').value;
-  const roadType = document.getElementById('road-type-select').value;
-  const highwayNo = document.getElementById('highway-no-select').value;
-
-  document.getElementById('auto-road-name').innerText = roadName || '--';
-  document.getElementById('auto-road-type').innerText = roadType || '--';
-  document.getElementById('auto-authority').innerText = roadType === 'National Highway' ? 'NHAI PIU' : (roadType ? 'Local authority' : '--');
-  latestRoadContext = { state, district, area, roadName, roadType, highwayNo };
-}
-
-function ensureSelectValue(selectEl, value) {
-  if (!selectEl || !value) return;
-  let option = Array.from(selectEl.options).find(opt => opt.value === value);
-  if (!option) {
-    option = document.createElement('option');
-    option.value = value;
-    option.innerText = value;
-    selectEl.appendChild(option);
-  }
-  selectEl.value = value;
-}
-
-function getGpsFromTags(tags) {
-  if (!tags || !tags.GPSLatitude || !tags.GPSLongitude) return null;
-  const lat = parseExifCoordinate(tags.GPSLatitude, tags.GPSLatitudeRef);
-  const lon = parseExifCoordinate(tags.GPSLongitude, tags.GPSLongitudeRef);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  return { latitude: lat, longitude: lon };
-}
-
-function parseExifCoordinate(tag, refTag) {
-  if (!tag) return NaN;
-  const refRaw = typeof refTag === 'string'
-    ? refTag
-    : (refTag && (refTag.description || refTag.value));
-  const ref = String(refRaw || '').trim().toUpperCase();
-  const parts = Array.isArray(tag.value)
-    ? tag.value
-    : Array.isArray(tag)
-      ? tag
-      : typeof tag === 'string'
-        ? tag.split(/[ ,]+/)
-        : (tag && typeof tag === 'object' && 'value' in tag)
-          ? tag.value
-          : [];
-
-  const degrees = convertExifValue(parts[0]);
-  const minutes = convertExifValue(parts[1]);
-  const seconds = convertExifValue(parts[2]);
-  if (![degrees, minutes, seconds].every(Number.isFinite)) return NaN;
-  let decimal = degrees + (minutes / 60) + (seconds / 3600);
-  if (ref === 'S' || ref === 'W') decimal = -decimal;
-  return decimal;
-}
-
-function convertExifValue(value) {
-  if (value === undefined || value === null) return NaN;
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const cleaned = value.trim();
-    if (cleaned.includes('/')) {
-      const [num, den] = cleaned.split('/').map(x => parseFloat(x.trim()));
-      return Number.isFinite(num) && Number.isFinite(den) && den !== 0 ? num / den : NaN;
-    }
-    return parseFloat(cleaned);
-  }
-  if (typeof value === 'object') {
-    if ('numerator' in value && 'denominator' in value) {
-      return Number(value.numerator) / Number(value.denominator);
-    }
-    if ('value' in value) {
-      return convertExifValue(value.value);
-    }
-    if (Array.isArray(value)) {
-      return convertExifValue(value[0]);
-    }
-  }
-  return NaN;
-}
+  // Initialize Language Switcher
+  changeLanguage('en');
+});
 
 /**
  * Retrieve User's current browser location
  */
 function requestBrowserLocation() {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        browserGpsCoords = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        };
-        if (!clientGpsCoords && !manualGpsCoords) {
-          setComplaintLocation(browserGpsCoords.latitude, browserGpsCoords.longitude, 'Current GPS Location');
-        }
-        console.log('Browser coordinates captured:', browserGpsCoords);
-      },
-      (error) => {
-        console.warn('Browser location access denied or unavailable:', error.message);
-        updateLocationFallbackMessage();
-      },
-      { enableHighAccuracy: true, timeout: 5000 }
-    );
+  if (!navigator.geolocation) {
+    console.warn('Browser geolocation is not supported on this device.');
+    return;
   }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      browserGpsCoords = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude
+      };
+      console.log('Browser coordinates captured:', browserGpsCoords);
+    },
+    (error) => {
+      console.warn('Browser location access denied or unavailable:', error.message);
+      browserGpsCoords = null;
+    },
+    { enableHighAccuracy: true, timeout: 5000 }
+  );
 }
 
 function showUploadSheet() {
@@ -706,6 +618,16 @@ async function submitComplaint(event) {
     if (stage === 5) label.innerText = 'Generating PDF Letter attachment...';
   }, 700);
 
+  const hasUsableGps = Boolean(clientGpsCoords || browserGpsCoords);
+  if (!hasUsableGps) {
+    clearInterval(scanInterval);
+    scanner.style.display = 'none';
+    submitBtn.removeAttribute('disabled');
+    submitBtn.innerText = 'Submit Verified Complaint';
+    alert('No usable GPS location was found. Please allow browser location access or upload a photo with EXIF GPS metadata.');
+    return;
+  }
+
   // Compile FormData
   const formData = new FormData();
   formData.append('image', selectedFile);
@@ -879,6 +801,35 @@ function displayTrackingInfo(complaint) {
 
   document.getElementById('track-val-piu').innerText = complaint.piuEmailMapping.name;
   document.getElementById('dispatch-piu-desc').innerText = `Emailed complaint details to Project Director at: ${complaint.piuEmailMapping.email}`;
+
+  // Render Contractor Ledger Details
+  const contractorSection = document.getElementById('track-contractor-section');
+  if (complaint.contractorDetails) {
+    document.getElementById('track-val-contractor').innerText = complaint.contractorDetails.contractorName;
+    document.getElementById('track-val-budget').innerText = `${complaint.contractorDetails.allocatedBudgetWords} (INR ${complaint.contractorDetails.allocatedBudgetRupees})`;
+    document.getElementById('track-val-period').innerText = complaint.contractorDetails.maintenancePeriod;
+    document.getElementById('track-val-contract-status').innerText = complaint.contractorDetails.status;
+    contractorSection.style.display = 'block';
+  } else {
+    contractorSection.style.display = 'none';
+  }
+
+  // Render Hazard Severity Gauge
+  const hazardSection = document.getElementById('track-hazard-section');
+  if (complaint.hazardResults) {
+    document.getElementById('track-val-severity-score').innerText = `${complaint.hazardResults.score} / 100`;
+    
+    const levelEl = document.getElementById('track-val-severity-level');
+    levelEl.innerText = complaint.hazardResults.level.toUpperCase();
+    
+    // Clean old severity classes
+    levelEl.className = 'info-value';
+    levelEl.classList.add(`severity-${complaint.hazardResults.level.toLowerCase()}`);
+    
+    hazardSection.style.display = 'block';
+  } else {
+    hazardSection.style.display = 'none';
+  }
   
   // PDF and Email link bindings
   document.getElementById('btn-download-pdf').href = complaint.pdfUrl;
@@ -1241,4 +1192,37 @@ function populateEmailsTable(emails) {
     `;
     tbody.appendChild(tr);
   });
+}
+
+/**
+ * Handles client-side multilingual translation toggling
+ */
+function changeLanguage(lang) {
+  currentLanguage = lang;
+  if (!window.translations || !window.translations[lang]) return;
+
+  const dictionary = window.translations[lang];
+
+  // Update all elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (dictionary[key]) {
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        el.placeholder = dictionary[key];
+      } else {
+        el.innerText = dictionary[key];
+      }
+    }
+  });
+
+  // Specifically handle placeholder fields that might not be static or need specific translation
+  const descInput = document.getElementById('description-input');
+  if (descInput && dictionary.placeholder_details) {
+    descInput.placeholder = dictionary.placeholder_details;
+  }
+  
+  const searchInput = document.getElementById('search-id-input');
+  if (searchInput && dictionary.placeholder_search) {
+    searchInput.placeholder = dictionary.placeholder_search;
+  }
 }
