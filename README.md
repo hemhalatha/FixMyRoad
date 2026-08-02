@@ -1,166 +1,66 @@
-# NHAI Citizen Safety & Road Defect Management Portal
+# Road Safety Complaint Portal
 
-An automated, full-stack platform designed to collect road defect complaints, run integrity & originality validations, classify pavement damage via computer vision, generate official complaint letters, and route notifications to regional NHAI Project Implementation Units (PIU).
+A full-stack project for collecting road-defect complaints, validating uploaded evidence, classifying surface damage, generating formal complaint documents, and routing complaints to the relevant PIU office.
 
----
-
-## 🏗️ System Architecture & Workflow
+## Workflow
 
 ```mermaid
 graph TD
-    A[Citizen Frontend UI] -->|1. Submit Photo & Form| B[Express Backend Server]
-    B --> C[2. Originality Check Service]
-    B --> D[3. AI Damage Classification]
-    B --> E[4. PDF Document Generator]
-    B --> F[5. PIU Email Router]
-    
-    C -->|Extracts EXIF Coordinates, Taken-Time, & Check Dupes| G[(Local JSON database)]
-    D -->|Validates Potholes / Cracks / Faded Markings| G
-    E -->|Generates Formal NHAI PDF Letter with Image| H[Public/PDFs/ Folder]
-    F -->|Maps Location to Closest PIU Office| I[Sent_Emails/ Preview Folder]
-    
-    G -->|Retrieve Status & Timeline| J[Tracking Dashboard]
+    A[Citizen uploads photo and complaint form] --> B[Express backend receives request]
+    B --> C[Metadata service validates EXIF, GPS, and duplicate signals]
+    B --> D[AI model service classifies the road damage]
+    B --> E[PDF service generates the official complaint letter]
+    B --> F[Email service maps the location to the nearest PIU and prepares dispatch output]
+
+    C --> G[(Complaint records and metadata storage)]
+    D --> G
+    E --> H[Public PDF output folder]
+    F --> I[Email preview / dispatch artifact folder]
 ```
 
+## Project Structure
 
-
-## 📝 Recent Updates & Bug Fixes
-
-### ✅ Filing Error Resolution (June 2026)
-**Issue**: "Filing Error: Failed to fetch" when submitting complaints  
-**Root Cause**: PDF service crashed due to missing null-checks on `complaint.metadataResults` when processing edge cases (missing EXIF data)  
-**Fix Applied**:
-- Added optional chaining (`?.`) and fallback values in `pdfService.js` footer generation
-- Improved error logging in `server.js` with full stack traces
-- Fixed file extension parsing to handle missing `originalname` properties
-- Tested end-to-end: Complaint submission now succeeds with proper 201 response
-
-**Current Status**: ✅ All complaint filing workflows operational
-- GPS-tagged photos: Full validation and email routing
-- EXIF-stripped images: Properly flagged as "Flagged for Review"
-- PDF generation: Working with safe metadata fallbacks
-- Email dispatch: Successfully routed to PIU offices
-
----
-
-## ⚙️ Installation & Running the Application
-
-Ensure you have [Node.js](https://nodejs.org/) installed, then follow these steps:
-
-### 1. Initialize Dependencies
-Open your terminal in the project directory and run:
-```bash
-npm install
-```
-This installs the required packages: `express`, `multer` (file handling), `exifreader` (metadata parsing), `pdfkit` (PDF rendering), `nodemailer` (email routing), and `uuid` (unique ID generation).
-
-### 2. Run the Server
-Start the local server process:
-```bash
-npm start
-```
-The server will start up and output:
-`NHAI Safety Portal backend running on http://localhost:3000`
-
-### 3. Open in Browser
-Open your browser and visit:
-```
-http://localhost:3000
+```text
+Road_safety/
+├── Backend/                  # API backend modules and service layer
+├── frontend/                 # Frontend application source
+├── public/                   # Static client assets and runtime output folders
+├── services/                 # Core backend business logic
+│   ├── metadataService.js    # EXIF/GPS validation, originality checks, and duplicate detection
+│   ├── modelService.js       # AI classification integration point
+│   ├── pdfService.js         # PDF document generation
+│   └── emailService.js       # PIU routing and notification preview
+├── data/                     # Complaint / dataset-related data files
+├── Database/                 # Schema and persistence-related resources
+├── Dataset/                  # Training and sample datasets
+├── server.js                 # Main Express entry point
+├── package.json              # Node runtime and dependency metadata
+└── requirements.txt          # Python-related dependency metadata
 ```
 
----
+## How the Application Runs
 
-## 🛠️ Code Structure & Developer Guide
+1. Install dependencies:
 
-```
-Road safety 1/
-│
-├── server.js               # Main Express app, middleware, and api routes
-├── package.json            # Node dependency configurations
-├── .gitignore              # Excludes development folders, uploads, PDFs, and email drafts
-│
-├── services/               # Jesika's Backend Business Logic
-│   ├── metadataService.js  # EXIF parsing, gps validation, distance maths, & duplicate hashing
-│   ├── modelService.js     # Road classification engine (pluggable API model bridge)
-│   ├── pdfService.js       # Assembles the NHAI official letter PDF documents
-│   └── emailService.js     # Resolves closest PIU emails and writes dispatch previews
-│
-├── data/
-│   └── complaints.json     # Local database record storing all filed incidents
-│
-├── sent_emails/            # Preview drafts of sent email logs (Open HTML files in browser)
-│
-└── public/                 # Citizen Dashboard Frontend UI
-    ├── index.html          # Web page structural sections (Tabs, Form, Stepper Tracker)
-    ├── css/style.css       # Premium glassmorphic custom theme
-    ├── js/app.js           # Extracts client EXIF, updates Leaflet maps, & runs API fetches
-    ├── uploads/            # Holds citizen evidence photographs
-    └── pdfs/               # Holds compiled NHAI complaint PDF documents
-```
+   ```bash
+   npm install
+   ```
 
----
+2. Start the server:
 
-## 🔍 How to Test the Portals Features
+   ```bash
+   npm start
+   ```
 
-1. **Verify GPS Pinning (Real Photo)**:
-   * Select a picture taken on a smartphone with location services enabled.
-   * The Leaflet map on the right will instantly pin the photo's exact capture location.
-   * Submit the complaint. The AI laser line will scan, file the issue, generate a PDF, map the closest PIU office, and write a mock dispatch email.
+3. Open the app in the browser:
 
-2. **Verify Fake Detection (Downloaded Picture / Screenshot)**:
-   * Select a downloaded image from Google or a screenshot (EXIF headers are stripped/missing).
-   * The system will flag a `Warning: Missing GPS` badge and lock the map.
-   * If submitted, the portal marks the status as `Flagged for Review` (Quarantined) and blocks it from routing emails to PIU offices.
+   ```text
+   http://localhost:3000
+   ```
 
-3. **Verify Spoof Detection (Edited Photo)**:
-   * Upload an image edited in Photoshop or Lightroom.
-   * The system flags the editing software used in the metadata list, drops the Originality Score, and flags it as suspicious.
+## Notes
 
-4. **Verify Duplicate Prevention**:
-   * Attempt to upload the exact same image twice.
-   * The backend rejects the second upload instantly, notifying the citizen of a duplicate submission.
+- The frontend is responsible for collecting complaint details and evidence uploads.
+- The backend validates uploaded content, records complaint metadata, and prepares downstream outputs.
+- The generated PDFs and email previews are stored in the corresponding public output folders for review.
 
-5. **Review Outputs**:
-   * Inspect the formatted PDF letters inside `public/pdfs/`.
-   * Open the mock HTML email dispatches in the `sent_emails/` folder to review what details route to the Project Directors.
-
----
-
-## 🐛 Troubleshooting & Common Issues
-
-### Issue: "Filing Error: Failed to fetch"
-**Status**: ✅ RESOLVED  
-**Solution**: Ensure the server is running with the latest code. The issue was caused by missing null-safety checks in PDF generation when handling missing EXIF metadata.
-
-### Issue: Server crashes on startup
-**Check**: Verify all dependencies are installed:
-```bash
-npm install
-```
-
-### Issue: Port 3000 already in use
-**Solution**: Kill the existing process or use a different port by setting the `PORT` environment variable:
-```bash
-PORT=4000 npm start
-```
-
-### Issue: Images not uploading
-**Check**: 
-- Ensure the `public/uploads/` directory exists (created automatically on first run)
-- Check browser console for fetch errors (F12 → Network tab)
-- Verify the file size is under 10MB (configured in `server.js`)
-
-### Issue: PDFs not generating
-**Check**: 
-- Ensure `public/pdfs/` directory is writable
-- Check that complaint data is being saved to `data/complaints.json`
-- Review server logs for detailed error messages
-
----
-
-## 📧 Support & Contributions
-
-For issues or feature requests, please open a GitHub issue on the [Road Safety repository](https://github.com/JesikaJeyaraj/Road_Safety.git).
-
-**Last Updated**: June 11, 2026  
-**Status**: Fully Operational ✅
