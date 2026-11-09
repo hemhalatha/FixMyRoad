@@ -102,40 +102,50 @@ FixMyRoad follows a modular service-oriented backend structure. Express.js coord
 
 ```mermaid
 flowchart TB
-    A["Citizen Web Application"]
-    B["Express.js Backend"]
+    A["Citizen / User"]
+    B["Web Application"]
+    C["Express.js API"]
 
-    A --> B
+    A --> B --> C
 
-    subgraph Services["Backend Services"]
-        direction TB
-        C["Image Metadata & Verification"]
-        D["AI Classification"]
-        E["Location Intelligence"]
-        F["Hazard Assessment"]
-        G["Contractor Lookup"]
+    subgraph S1["Processing Services"]
+        direction LR
+        D["Image Verification"]
+        E["AI Classification"]
+        F["Location Intelligence"]
     end
 
-    B --> C
-    B --> D
-    B --> E
-    B --> F
-    B --> G
+    subgraph S2["Assessment and Routing"]
+        direction LR
+        G["Hazard Assessment"]
+        H["Contractor Lookup"]
+        I["Authority Routing"]
+    end
 
-    C --> H[("Complaint JSON Storage")]
-    D --> H
-    E --> H
+    subgraph S3["Outputs"]
+        direction LR
+        J["Complaint Tracking"]
+        K["PDF Reports"]
+        L["Email Logs"]
+        M["Analytics and Heatmaps"]
+    end
+
+    C --> D
+    C --> E
+    C --> F
+
+    D --> G
+    E --> G
     F --> H
-    G --> H
 
-    B --> I["PDF Generation"]
-    B --> J["Authority Routing"]
+    G --> I
+    H --> I
 
-    I --> K[("Generated PDFs")]
-    J --> L[("Email Preview Logs")]
+    I --> J
+    I --> K
+    I --> L
 
-    H --> M["Complaint Tracking"]
-    H --> N["Analytics & Heatmaps"]
+    J --> M
 ```
 
 ### Complaint Processing Workflow
