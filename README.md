@@ -101,7 +101,6 @@ The platform integrates computer vision, image metadata analysis, geospatial int
 FixMyRoad follows a modular service-oriented backend structure. Express.js coordinates complaint processing and delegates specialized tasks to independent service modules.
 
 ```mermaid
-```mermaid
 flowchart TB
     A["Citizen Web Application"]
     B["Express.js Backend"]
@@ -137,7 +136,6 @@ flowchart TB
 
     H --> M["Complaint Tracking"]
     H --> N["Analytics & Heatmaps"]
-```
 ```
 
 ### Complaint Processing Workflow
